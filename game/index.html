@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Aurora Falls — 3D Open-World Crime</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: #0a1220;
+    font-family: "Segoe UI", system-ui, monospace; color: #e8f0f8; }
+  #game, #game canvas { position: fixed; inset: 0; }
+  #hud { position: fixed; inset: 0; pointer-events: none; display: none; z-index: 5; }
+  .panel { position: absolute; background: rgba(8, 14, 24, 0.72); border: 1px solid rgba(120, 200, 255, 0.25);
+    border-radius: 8px; padding: 8px 12px; backdrop-filter: blur(2px); }
+  #topleft { top: 12px; left: 12px; min-width: 210px; }
+  #money { font-size: 22px; font-weight: 700; color: #7dffce; }
+  #health { font-size: 14px; margin-top: 2px; }
+  #healthbar-wrap { height: 6px; background: rgba(255,255,255,0.15); border-radius: 3px; margin-top: 4px; overflow: hidden; }
+  #healthbar { height: 100%; width: 100%; background: #39d353; }
+  #respect, #standing { font-size: 11px; color: #9fb4cc; margin-top: 3px; }
+  #wanted { top: 12px; right: 12px; font-size: 26px; letter-spacing: 4px; color: #ffd23f;
+    text-shadow: 0 0 12px rgba(255, 210, 63, 0.6); }
+  #objective { top: 12px; left: 50%; transform: translateX(-50%); max-width: 46%;
+    font-size: 14px; text-align: center; color: #ffe9a8; }
+  #speedo { bottom: 14px; right: 14px; text-align: right; }
+  #speed { font-size: 30px; font-weight: 700; }
+  #weapon { font-size: 13px; color: #9fd8ff; margin-top: 2px; }
+  #radio { font-size: 12px; color: #b78cff; margin-top: 2px; }
+  #minimap-wrap { bottom: 14px; left: 14px; padding: 6px; }
+  #minimap { display: block; width: 180px; height: 180px; }
+  #crosshair { position: absolute; left: 50%; top: 50%; width: 18px; height: 18px;
+    transform: translate(-50%, -50%); }
+  #crosshair::before, #crosshair::after { content: ""; position: absolute; background: rgba(255,255,255,0.9); }
+  #crosshair::before { left: 8px; top: 0; width: 2px; height: 18px; }
+  #crosshair::after { left: 0; top: 8px; width: 18px; height: 2px; }
+  #banner { position: absolute; top: 22%; left: 50%; transform: translateX(-50%); text-align: center;
+    opacity: 0; transition: opacity 0.4s; }
+  #banner.show { opacity: 1; }
+  .banner-title { font-size: 42px; font-weight: 800; letter-spacing: 6px; color: #fff;
+    text-shadow: 0 0 24px rgba(57, 255, 136, 0.7), 0 2px 0 #000; }
+  .banner-sub { font-size: 16px; color: #ffe9a8; margin-top: 6px; text-shadow: 0 1px 0 #000; }
+  #bark { position: absolute; bottom: 210px; left: 50%; transform: translateX(-50%);
+    font-size: 15px; background: rgba(8,14,24,0.8); padding: 6px 14px; border-radius: 6px;
+    opacity: 0; transition: opacity 0.3s; white-space: nowrap; }
+  #bark.show { opacity: 1; }
+  .bark-who { color: #39ff88; font-weight: 700; }
+  #toast { position: absolute; bottom: 170px; left: 50%; transform: translateX(-50%);
+    font-size: 14px; background: rgba(8,14,24,0.8); padding: 6px 14px; border-radius: 6px;
+    opacity: 0; transition: opacity 0.3s; white-space: nowrap; }
+  #toast.show { opacity: 1; }
+  #help { position: absolute; bottom: 14px; left: 50%; transform: translateX(-50%);
+    font-size: 11px; color: rgba(230, 240, 255, 0.65); text-align: center; }
+  #garage { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+    background: rgba(8, 14, 24, 0.94); border: 1px solid #39ff88; border-radius: 10px;
+    padding: 18px 22px; display: none; pointer-events: auto; min-width: 420px; z-index: 8; }
+  #garage h2 { color: #39ff88; letter-spacing: 3px; margin-bottom: 8px; }
+  .garage-money { color: #7dffce; font-size: 18px; margin-bottom: 10px; }
+  .garage-row { display: flex; gap: 10px; align-items: center; margin: 8px 0; font-size: 14px; }
+  .garage-row b { width: 150px; }
+  .garage-row span { flex: 1; color: #9fb4cc; }
+  .garage-row button { pointer-events: auto; cursor: pointer; background: #123524; color: #7dffce;
+    border: 1px solid #39ff88; border-radius: 6px; padding: 6px 12px; font-size: 13px; }
+  .garage-hint { margin-top: 10px; font-size: 12px; color: #9fb4cc; }
+  #start, #wasted { position: fixed; inset: 0; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; z-index: 10; text-align: center;
+    background: linear-gradient(180deg, rgba(6,10,20,0.55), rgba(6,10,20,0.88)); }
+  #wasted { display: none; }
+  #start h1 { font-size: 64px; letter-spacing: 10px; font-weight: 900; color: #fff;
+    text-shadow: 0 0 34px rgba(57, 255, 136, 0.8), 0 0 60px rgba(183, 140, 255, 0.6); }
+  #start h2 { font-size: 17px; color: #7dffce; letter-spacing: 4px; margin: 8px 0 18px; font-weight: 600; }
+  #start p { max-width: 620px; font-size: 15px; line-height: 1.6; color: #c8d8ea; }
+  #start .crew { margin-top: 12px; font-size: 14px; color: #ffe9a8; }
+  #play { pointer-events: auto; cursor: pointer; margin-top: 26px; font-size: 20px; font-weight: 800;
+    letter-spacing: 4px; color: #04120a; background: #39ff88; border: none; border-radius: 8px;
+    padding: 14px 44px; box-shadow: 0 0 30px rgba(57, 255, 136, 0.55); }
+  #play:hover { background: #7dffce; }
+  #start .controls { margin-top: 20px; font-size: 13px; color: #9fb4cc; line-height: 1.9; }
+  #wasted h1 { font-size: 56px; letter-spacing: 8px; color: #ff4444; text-shadow: 0 0 30px rgba(255,68,68,0.7); }
+  #wasted p { margin-top: 10px; color: #c8d8ea; }
+</style>
+<script type="importmap">
+{ "imports": { "three": "./vendor/three.module.min.js" } }
+</script>
+</head>
+<body>
+<div id="game"></div>
+<div id="hud">
+  <div class="panel" id="topleft">
+    <div id="money">$250</div>
+    <div id="health">♥ 100</div>
+    <div id="healthbar-wrap"><div id="healthbar"></div></div>
+    <div id="respect">Respect 0</div>
+    <div id="standing"></div>
+  </div>
+  <div class="panel" id="wanted">☆☆☆☆☆</div>
+  <div class="panel" id="objective">Explore Aurora Falls — press M for a mission</div>
+  <div class="panel" id="speedo">
+    <div id="speed">0 km/h</div>
+    <div id="weapon">Pistol [1/4]</div>
+    <div id="radio">AURORA FM</div>
+  </div>
+  <div class="panel" id="minimap-wrap"><canvas id="minimap" width="180" height="180"></canvas></div>
+  <div id="crosshair"></div>
+  <div id="banner"></div>
+  <div id="bark"></div>
+  <div id="toast"></div>
+  <div id="help">WASD drive · Space drift · F exit car · E jack / interact · 1-4 weapons · Q cycle · M mission · G garage · R radio · Mouse shoot</div>
+  <div id="garage"></div>
+</div>
+<div id="start">
+  <h1>AURORA FALLS</h1>
+  <h2>A SNOWBOUND OPEN-WORLD CRIME GAME</h2>
+  <p>Kai is a getaway driver in a mountain city under the aurora. The Warden owns
+  the resort, the lake and the law — take the mountain back, one staged heist at a time.
+  Eight missions. Five districts. Five stars of AFPD heat, and the NORTHERN-1 helicopter
+  sweeping its searchlight through the snow.</p>
+  <p class="crew">Crew: MAYA — ice-road driver · DARIO — hacker · JUNE — lookout</p>
+  <button id="play">▶ &nbsp;PLAY</button>
+  <div class="controls">WASD drive &nbsp;·&nbsp; Space drift &nbsp;·&nbsp; F exit car &nbsp;·&nbsp; E jack a car / interact
+  &nbsp;·&nbsp; 1-4 / Q weapons &nbsp;·&nbsp; Mouse shoot &nbsp;·&nbsp; M mission &nbsp;·&nbsp; G garage &nbsp;·&nbsp; R radio</div>
+</div>
+<div id="wasted">
+  <h1>BUSTED</h1>
+  <p>AFPD dropped you at the city limits. The mountain is still yours to take.</p>
+</div>
+<script type="module" src="./src/main.js"></script>
+</body>
+</html>
